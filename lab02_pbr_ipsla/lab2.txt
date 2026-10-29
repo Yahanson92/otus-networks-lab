@@ -1,0 +1,51 @@
+ 
+! --- ОФИС ЛАБЫТНАНГИ (R27) ---
+! Настройка маршрута по умолчанию в сторону R25 (Триада)
+conf t
+ip route 0.0.0.0 0.0.0.0 10.0.3.1
+end
+wr
+
+
+! --- ОФИС ЧОКУРДАХ (R28) ---
+! Настройка балансировки и отказоустойчивости через PBR
+
+conf t
+! 1. IP SLA для первого линка (на R25)
+ip sla 1
+ icmp-echo 10.0.5.1 source-interface Ethernet0/0
+ frequency 10
+ip sla schedule 1 life forever start-time now
+track 1 ip sla 1 reachability
+
+! 2. IP SLA для второго линка (на R26)
+ip sla 2
+ icmp-echo 10.0.5.5 source-interface Ethernet0/1
+ frequency 10
+ip sla schedule 2 life forever start-time now
+track 2 ip sla 2 reachability
+
+! 3. ACL для отлова трафика VLAN 30 и 31
+access-list 130 permit ip 192.168.30.0 0.0.0.255 any
+access-list 131 permit ip 192.168.31.0 0.0.0.255 any
+
+! 4. Route-Map для перенаправления трафика
+! VLAN 30 -> Основной: R25 (Track 1), Резерв: R26 (Track 2)
+route-map PBR_CHOKURDAKH permit 10
+ match ip address 130
+ set ip next-hop verify-availability 10.0.5.1 10 track 1
+ set ip next-hop verify-availability 10.0.5.5 20 track 2
+
+! VLAN 31 -> Основной: R26 (Track 2), Резерв: R25 (Track 1)
+route-map PBR_CHOKURDAKH permit 20
+ match ip address 131
+ set ip next-hop verify-availability 10.0.5.5 10 track 2
+ set ip next-hop verify-availability 10.0.5.1 20 track 1
+
+! 5. Применение Route-Map на входящие сабинтерфейсы (шлюзы компьютеров)
+interface Ethernet0/2.30
+ ip policy route-map PBR_CHOKURDAKH
+interface Ethernet0/2.31
+ ip policy route-map PBR_CHOKURDAKH
+end
+wr
