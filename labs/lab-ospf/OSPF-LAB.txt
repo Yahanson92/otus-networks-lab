@@ -1,0 +1,132 @@
+
+! ------------------------------------------------------------------------------
+! 1. R14 (ABR: Area 0, Area 10, Stub Area 101)
+! ------------------------------------------------------------------------------
+conf t
+router ospf 1
+ router-id 10.255.255.14
+ area 101 stub
+ default-information originate always
+ area 10 virtual-link 10.255.255.15
+ exit
+
+interface Loopback0
+ ip ospf 1 area 0
+interface Ethernet0/2
+ ip ospf 1 area 0
+interface Ethernet0/0
+ ip ospf 1 area 10
+interface Ethernet0/1
+ ip ospf 1 area 10
+interface Ethernet0/3
+ ip ospf 1 area 101
+end
+wr
+
+! ------------------------------------------------------------------------------
+! 2. R19 (Внутренний роутер Stub-зоны 101)
+! ------------------------------------------------------------------------------
+conf t
+router ospf 1
+ router-id 10.255.255.19
+ area 101 stub
+ exit
+
+interface Loopback0
+ ip ospf 1 area 101
+interface Ethernet0/0
+ ip ospf 1 area 101
+end
+wr
+
+! ------------------------------------------------------------------------------
+! 3. R15 (ABR: Area 0, Area 10, Area 102 + Фильтрация для зоны 101)
+! ------------------------------------------------------------------------------
+conf t
+ip prefix-list BLOCK_ZONE101 seq 5 deny 10.0.0.12/30
+ip prefix-list BLOCK_ZONE101 seq 10 deny 10.255.255.19/32
+ip prefix-list BLOCK_ZONE101 seq 15 permit 0.0.0.0/0 le 32
+
+router ospf 1
+ router-id 10.255.255.15
+ default-information originate always
+ area 10 virtual-link 10.255.255.14
+ area 102 filter-list prefix BLOCK_ZONE101 out
+ exit
+
+interface Loopback0
+ ip ospf 1 area 0
+interface Ethernet0/2
+ ip ospf 1 area 0
+interface Ethernet0/1
+ ip ospf 1 area 10
+interface Ethernet0/3
+ ip ospf 1 area 10
+interface Ethernet0/0
+ ip ospf 1 area 102
+end
+wr
+
+! ------------------------------------------------------------------------------
+! 4. R20 (Внутренний роутер Area 102)
+! ------------------------------------------------------------------------------
+conf t
+router ospf 1
+ router-id 10.255.255.20
+ exit
+
+interface Loopback0
+ ip ospf 1 area 102
+interface Ethernet0/2
+ ip ospf 1 area 102
+end
+wr
+
+! ------------------------------------------------------------------------------
+! 5. R12 (Основной шлюз — Area 10)
+! ------------------------------------------------------------------------------
+conf t
+router ospf 1
+ router-id 10.255.255.12
+ passive-interface Ethernet0/0.10
+ passive-interface Ethernet0/0.70
+ passive-interface Ethernet0/0.99
+ exit
+
+interface Loopback0
+ ip ospf 1 area 10
+interface Ethernet0/2
+ ip ospf 1 area 10
+interface Ethernet0/3
+ ip ospf 1 area 10
+interface Ethernet0/0.10
+ ip ospf 1 area 10
+interface Ethernet0/0.70
+ ip ospf 1 area 10
+interface Ethernet0/0.99
+ ip ospf 1 area 10
+end
+wr
+
+! ------------------------------------------------------------------------------
+! 6. R13 (Резервный шлюз — Area 10)
+! ------------------------------------------------------------------------------
+conf t
+router ospf 1
+ router-id 10.255.255.13
+ passive-interface Ethernet0/0.10
+ passive-interface Ethernet0/0.70
+ exit
+
+interface Loopback0
+ ip ospf 1 area 10
+interface Ethernet0/2
+ ip ospf 1 area 10
+interface Ethernet0/3
+ ip ospf 1 area 10
+interface Ethernet0/0.10
+ ip ospf 1 area 10
+interface Ethernet0/0.70
+ ip ospf 1 area 10
+end
+wr
